@@ -15,7 +15,9 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
-    "ios": "expo start --ios"
+    "ios": "expo start --ios",
+    "test:domain": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck:domain": "tsc --ignoreConfig --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck src/domain/*.ts"
   },
   "private": true
 }

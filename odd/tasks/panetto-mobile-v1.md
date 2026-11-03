@@ -141,8 +141,8 @@ La propuesta aceptada fue eliminar recetas con confirmación.
 La implementación está autorizada. El usuario autorizó inicializar un repositorio Git local en el proyecto existente para continuar, sin crear un remoto.
 
 - T0 [S1–S8] — Inicializar Git local y crear rama `feat/panetto-mobile-v1`; ruta: inline; estado: done, raíz y branch verificados; baseline commit `9705347`; sin remoto.
-- T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: in_progress; commit: pendiente.
-- T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: inline; estado: pendiente; commit: pendiente.
+- T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
+- T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: in_progress (parent verified 10/10 domain tests, strict domain/app typechecks pass; commit and assessment pending); commit: pendiente.
 - T3 [S6–S8] — Implementar almacenamiento local y operaciones de recetas con manejo de fallos y pruebas; ruta: inline; estado: pendiente; commit: pendiente.
 - T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: pendiente; commit: pendiente.
 - T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
@@ -223,4 +223,26 @@ Fuentes consultadas el 2026-11-03: Expo SDK 58 reference (`https://docs.expo.dev
 
 ### L9 — Normalización del scaffold y validación inicial
 
-Se configuró `mobile/app.json` y `mobile/package.json` para Panetto, se quitó el comando web de alcance futuro y se eliminaron `mobile/AGENTS.md`, `mobile/.claude/` y `mobile/LICENSE` generados por la plantilla (incluía una MIT no elegida). Se regeneró lockfile con scripts deshabilitados. `npx tsc --noEmit` y `npx expo-doctor` pasan (20/20); `npx expo export --platform ios` terminó con exit 0 y compiló el bundle iOS de 618 módulos. T1 scaffold está verificado y su commit queda pendiente; npm audit mantiene los 5 avisos moderados documentados en L8.
+Se configuró `mobile/app.json` y `mobile/package.json` para Panetto, se quitó el comando web de alcance futuro y se eliminaron `mobile/AGENTS.md`, `mobile/.claude/` y `mobile/LICENSE` generados por la plantilla (incluía una MIT no elegida). Se regeneró lockfile con scripts deshabilitados. `npx tsc --noEmit` y `npx expo-doctor` pasan (20/20); `npx expo export --platform ios` terminó con exit 0 y compiló el bundle iOS de 618 módulos. T1 scaffold quedó implementado y comprobado; npm audit mantiene los 5 avisos moderados documentados en L8.
+
+### L10 — Verificación independiente de T1
+
+El commit `cb13417` (`feat: scaffold Panetto mobile app`) pasa comparación independiente contra `9705347`: Expo/RN/TS presente, sin WebView ni runtime web, metadatos Panetto correctos y `Sources/`, `Resources/`, `scripts/build.sh` sin cambios. Verifier observó typecheck e iOS export correctos en copia aislada, además Android export correcto (616 módulos); diff-check y tree limpio. Verdict S1 aceptado para alcance de scaffold; S2–S8 quedan fuera de esa unidad. El texto de plantilla en inglés de `mobile/App.tsx` se reemplazará en pantallas de producto. Assessment native: risk high por escalación item 5, `nativeRisk: medium`, `agentEscalation.applied: true`, plan requiere self-verification e independent verifier; `reviewDue: false`, outcome unknown, por tanto no se inició review nativa. El verifier reportó un scratch temporal externo a la raíz; no se inspeccionó ni modificó desde la sesión padre.
+
+T2 (dominio y cálculos) pasa a in_progress por activarse el context backstop; se delega como unidad acotada en `mobile/src/domain/**`, `mobile/tests/**` y el runner declarado en `mobile/package.json`. Todo lo demás permanece pendiente.
+
+### L11 — Cierre de scaffolding y siguiente ruta
+
+El evento de finalización de `npx expo export --platform ios` fue exit 0; el bundle incluye 618 módulos. Se revisó el resultado del verifier para T1 y se aceptó S1 en su alcance. T1 queda cerrado en `cb13417`; T2 comienza con desarrollo test-first. Se intentará el worker; si el runtime vuelve a rechazarlo, se aplica fallback inline y se registra.
+
+### L12 — Revisión del resultado delegado y estado del trabajo
+
+Worker reportó TDD con 10 pruebas GREEN y focused typecheck GREEN después de ajustar comandos. La revisión del padre leyó todos los archivos del dominio, pruebas, README y package config; `npm run test:domain` efectivamente pasó 10/10. Sin embargo, `npm run typecheck:domain && npx tsc --noEmit` se detuvo con exit 2 y TS2591/TS5097 en tests (`node:assert/strict`, `node:test`, extensión `.ts`); por tanto no se verificó el `npx tsc` de la app en ese comando. T2 permanece in_progress; corregir y repetir comprobaciones. Se ensayó un test adicional de cambio de modo con harina en cero; falló porque la conversión requiere una fórmula válida, pero esa expectativa no está exigida y el usuario puede corregir el borrador en el modo actual. Se retirará ese test para no ampliar requisitos. Ajustar el typecheck para no incluir tests de Node dentro del build TypeScript de Expo y volver a ejecutar las verificaciones. No marcar tareas posteriores como completadas.
+
+### L13 — Ajuste de compilación de tests
+
+Se retiró el test de cambio de modo con fórmula inválida por asumir comportamiento no especificado. Se cambió `mobile/tsconfig.json` para excluir pruebas del build de aplicación y el script `typecheck:domain` para verificar solo el dominio puro, sin exigir tipos Node transitorios. La verificación final se registra en L14.
+
+### L14 — Verificación final del dominio
+
+El padre ejecutó después de los ajustes: `cd mobile && npm run test:domain` — exit 0, 10/10; `cd mobile && npm run typecheck:domain` — exit 0; `cd mobile && npx tsc --noEmit` — exit 0. Node emite el warning no fatal `MODULE_TYPELESS_PACKAGE_JSON` al ejecutar los tests TypeScript como ESM sin cambiar el modo del paquete. T2 sigue in_progress hasta commit y evaluación RDD; no quedan fallos en estas comprobaciones.
