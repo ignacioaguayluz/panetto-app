@@ -142,8 +142,8 @@ La implementación está autorizada. El usuario autorizó inicializar un reposit
 
 - T0 [S1–S8] — Inicializar Git local y crear rama `feat/panetto-mobile-v1`; ruta: inline; estado: done, raíz y branch verificados; baseline commit `9705347`; sin remoto.
 - T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
-- T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: in_progress (parent verified 10/10 domain tests, strict domain/app typechecks pass; commit and assessment pending); commit: pendiente.
-- T3 [S6–S8] — Implementar almacenamiento local y operaciones de recetas con manejo de fallos y pruebas; ruta: inline; estado: pendiente; commit: pendiente.
+- T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: done; commit: `b657081` (`feat: add tested baker percentage domain`); RED/GREEN observado, test domain 10/10, domain/app typecheck pass; assessment medium, `reviewDue: false`, no verifier adicional requerido.
+- T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: in_progress (17/17 tests, strict domain/app typechecks, Expo Doctor and iOS/Android exports pass; commit/assessment pending; native runtime check in T6); commit: pendiente.
 - T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: pendiente; commit: pendiente.
 - T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
 - T6 [S1–S8] — Verificar integración en iOS y Android, accesibilidad, persistencia, documentación y límites conocidos; ruta: inline más verificación independiente cuando el riesgo lo requiera; estado: pendiente; commit: pendiente.
@@ -245,4 +245,40 @@ Se retiró el test de cambio de modo con fórmula inválida por asumir comportam
 
 ### L14 — Verificación final del dominio
 
-El padre ejecutó después de los ajustes: `cd mobile && npm run test:domain` — exit 0, 10/10; `cd mobile && npm run typecheck:domain` — exit 0; `cd mobile && npx tsc --noEmit` — exit 0. Node emite el warning no fatal `MODULE_TYPELESS_PACKAGE_JSON` al ejecutar los tests TypeScript como ESM sin cambiar el modo del paquete. T2 sigue in_progress hasta commit y evaluación RDD; no quedan fallos en estas comprobaciones.
+El padre ejecutó después de los ajustes: `cd mobile && npm run test:domain` — exit 0, 10/10; `cd mobile && npm run typecheck:domain` — exit 0; `cd mobile && npx tsc --noEmit` — exit 0. Node emite el warning no fatal `MODULE_TYPELESS_PACKAGE_JSON` al ejecutar los tests TypeScript como ESM sin cambiar el modo del paquete. No quedaron fallos en estas comprobaciones.
+
+### L15 — Commit y assessment de dominio
+
+T2 quedó en `b657081` (`feat: add tested baker percentage domain`), 415 líneas modificadas, con tests, documentación y dominio juntos. Native ASSESS contra `cb13417`: risk medium, `reviewDue: false` (`under_budget`), outcome unknown, ningún high-risk item escalado; plan pide self-verification sin verifier independiente. El self-verification padre está registrado en L14; no se inició review nativa. T2 done. T3 (almacenamiento local) queda in_progress.
+
+### L16 — Decisión de persistencia
+
+La referencia oficial de Expo SQLite para SDK 58 confirma soporte iOS/Android, `runAsync` con parámetros para escapar valores de usuario y `withExclusiveTransactionAsync` para evitar que otras escrituras se mezclen en una transacción. Se elige Expo SQLite, con schema versionado y transacciones explícitas para inicialización; los CRUD serán statements con valores enlazados. La capa de repositorio será portable y testeable tras interfaz pública con SQLite en memoria para tests, y el adaptador nativo Expo se probará en simuladores. Corrupt JSON/schema genera error visible; jamás se sustituye por receta de ejemplo. S6–S8 pruebas cubrirán persistencia, fallo, empty state, edición y eliminación.
+
+### L17 — Instalación de Expo SQLite
+
+`npx expo install expo-sqlite` terminó con exit 0 y fijó `expo-sqlite@~58.0.15`, compatible con SDK 58. Expo añadió el config plugin `expo-sqlite` a `mobile/app.json`. Persisten los cinco advisories moderados de glob/minimatch ya registrados; no se aplicó arreglo forzado.
+
+### L18 — RED de persistencia
+
+Se añadieron tests para repositorio SQLite público sobre DB SQLite en memoria, cubriendo lista vacía sin seed, persistencia/reapertura, valores hostiles, validación, update/delete acotados, fallos de read/write, datos corruptos y versión de esquema futura. `cd mobile && npm run test:domain` falló con exit 1 esperado: las 10 pruebas de dominio pasan y `tests/storage.test.ts` no puede importar `src/storage/recipeRepository.ts`, aún no creado (`ERR_MODULE_NOT_FOUND`). Esto registra el RED antes de implementar. T3 sigue in_progress; repo y adaptador Expo ya están escritos, pero una ejecución GREEN todavía no se obtuvo.
+
+### L19 — Primer intento GREEN de persistencia
+
+Se implementaron `mobile/src/storage/recipeRepository.ts` y `mobile/src/storage/expoRecipeRepository.ts`. `cd mobile && npm run test:domain` continúa en exit 1: las 10 pruebas de dominio pasan; el runner aborta al cargar `RepositoryError` porque Node 24 `--experimental-strip-types` no admite parameter properties (`ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX`). Corregir esa sintaxis compatible con strip-only y repetir suite, typechecks y verificaciones Expo. T3 sigue in_progress; no marcar almacenamiento completo.
+
+### L20 — GREEN de persistencia
+
+Se cambió `RepositoryError` a sintaxis TypeScript compatible con Node strip-only y se agregó extensión `.ts` al import del dominio para que Node ESM resuelva el módulo. `cd mobile && npm run test:domain` ahora termina exit 0: 17/17 pruebas (10 dominio, 7 SQLite repository). Continúan dos warnings no fatales `MODULE_TYPELESS_PACKAGE_JSON`. Falta completar typechecks de dominio/app y verificar el adaptador SQLite en runtime antes de cerrar T3.
+
+### L21 — Verificación plataforma y bloqueo TypeScript
+
+Resultados: `cd mobile && npm run test:domain` exit 0, 17/17; `npx expo-doctor` exit 0, 20/20; `npx expo export --platform ios` exit 0 (618 módulos); `npx expo export --platform android` exit 0 (616 módulos). El comando `npm run typecheck:domain && npx tsc --noEmit` falló con exit 2 por TS5097: el import explícito `.ts` necesario para Node ESM no está habilitado en TypeScript. Corregir configuración y repetir ambos typechecks. Los exports no equivalen a probar runtime SQLite en un simulador; verificación nativa se hará en T6 cuando la UI use el repositorio.
+
+### L22 — Typecheck y nuevo caso RED de storage
+
+Se agregó `allowImportingTsExtensions` a `mobile/tsconfig.json`. `npm run typecheck:domain` y `npx tsc --noEmit` ahora pasan; los 17 tests habían pasado antes. Se amplió la suite para verificar escritura fallida, identificador vacío y versión futura sin inspeccionar storage interno. RED observado: `npm run test:domain` exit 1, 16/17 pasan; el caso de ID vacío falla porque el código devuelve `not_found` en vez de una categoría para ID inválido. Cambiar el error a `invalid_id`, correr GREEN y mantener el runtime SQLite en T6, no bloquear la finalización de T3 por una prueba nativa que corresponde a integración.
+
+### L23 — GREEN y chequeos de almacenamiento
+
+`cd mobile && npm run test:domain` — exit 0, 17/17 (10 domain, 7 SQLite); `npm run typecheck:domain` y `npx tsc --noEmit` — exit 0; `npx expo-doctor` — exit 0, 20/20; `npx expo export --platform ios` — exit 0, 618 módulos; Android — exit 0, 616 módulos. Se corrigió error code `invalid_id`. Dos warnings de Node sobre MODULE_TYPELESS_PACKAGE_JSON siguen siendo no fatales. Native SQLite runtime permanece en T6 y no se declara cubierto por bundle export. T3 no se cerrará hasta guardar el commit y completar el assessment/verifier que indique RDD.

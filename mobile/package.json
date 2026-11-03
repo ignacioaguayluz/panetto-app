@@ -4,6 +4,7 @@
   "main": "index.ts",
   "dependencies": {
     "expo": "~58.0.23",
+    "expo-sqlite": "~58.0.15",
     "expo-status-bar": "~58.0.4",
     "react": "19.3.0",
     "react-native": "0.88.1"
@@ -16,7 +17,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "test:domain": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:domain": "node --experimental-strip-types --experimental-sqlite --test tests/*.test.ts",
     "typecheck:domain": "tsc --ignoreConfig --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck src/domain/*.ts"
   },
   "private": true
