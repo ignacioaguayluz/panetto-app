@@ -140,8 +140,8 @@ La propuesta aceptada fue eliminar recetas con confirmación.
 
 La implementación está autorizada. El usuario autorizó inicializar un repositorio Git local en el proyecto existente para continuar, sin crear un remoto.
 
-- T0 [S1–S8] — Inicializar Git local y crear rama `feat/panetto-mobile-v1`; ruta: inline; estado: done, `git init -b feat/panetto-mobile-v1` confirmado y raíz/branch verificados; commit: pendiente.
-- T1 [S1] — Preparar proyecto móvil aislado de macOS, estructura y herramientas de pruebas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: in_progress; commit: pendiente.
+- T0 [S1–S8] — Inicializar Git local y crear rama `feat/panetto-mobile-v1`; ruta: inline; estado: done, raíz y branch verificados; baseline commit `9705347`; sin remoto.
+- T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: in_progress; commit: pendiente.
 - T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: inline; estado: pendiente; commit: pendiente.
 - T3 [S6–S8] — Implementar almacenamiento local y operaciones de recetas con manejo de fallos y pruebas; ruta: inline; estado: pendiente; commit: pendiente.
 - T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: pendiente; commit: pendiente.
@@ -210,3 +210,17 @@ La solicitud autoriza implementar y ejecutar la app móvil conforme a esta espec
 > “no hay una actualmente, puedes ejecutarla tu mismo para no frenar la implementación?”
 
 Autorización explícita para inicializar Git local y continuar la implementación. `git init -b feat/panetto-mobile-v1` tuvo éxito en la raíz del proyecto; `git status --short --branch` confirmó la rama y `git rev-parse --show-toplevel` confirmó la raíz. No se configuró remoto. T0 completo. Se intentó delegar T1 al worker por el aviso de context backstop; el runtime rechazó la tarea con `invalid-published-state`, por lo que se ejecuta inline como fallback. El resto queda pendiente y ninguna de esas tareas se marca como terminada.
+
+### L7 — Base Git y entorno móvil
+
+Se capturó el estado inicial existente en el commit raíz `9705347` (`chore: capture existing Panetto baseline`) de `feat/panetto-mobile-v1`; el working tree quedó limpio. Comprobaciones de entorno: Node `v24.21.0`, npm `11.19.0`, Xcode disponible en `/Applications/Xcode.app/Contents/Developer`; simuladores iOS 27 disponibles (por ejemplo iPhone 18 Pro). `npx --yes create-expo-app@latest mobile --template blank-typescript` terminó con exit 0 y creó Expo SDK 58, TypeScript y React Native 0.88; el template terminó correctamente pese a imprimir una pregunta de inicialización Git. No se ejecutó aún una app Expo ni se verificó Android.
+
+### L8 — Revisión de dependencias y avance del seguimiento
+
+La auditoría detallada confirma 5 hallazgos moderados, todos derivados de `glob@13.0.6` y `minimatch@10.2.6` en el árbol de `expo@58.0.23`, `@expo/cli` y `@expo/fingerprint`; no hay hallazgos altos ni críticos. `npm audit fix --dry-run` solo propone instalar Expo 53.0.11 (downgrade major). El issue upstream `expo/expo#52735` describe el mismo problema en SDK 58 y está abierto; indica que forzar `minimatch@11` puede romper consumidores de `makeRe`. No se aplicó downgrade, `npm audit fix --force` ni overrides generales. Dejar registrada la limitación y continuar con SDK 58 si compatibilidad funcional permanece verificada; reevaluar si upstream publica parche antes del cierre.
+
+Fuentes consultadas el 2026-11-03: Expo SDK 58 reference (`https://docs.expo.dev/versions/v58.0.0/`, requiere Node 22.13+ y React Native 0.88); Expo upstream issue `https://github.com/expo/expo/issues/52735`; advisories `https://github.com/advisories/GHSA-3g3m-2fjr-6pw4` y `https://github.com/advisories/GHSA-g3hv-75wg-m249` (fixed glob 14.0.2+, minimatch 11.0.1+). Node 24.21.0 cumple el requisito del SDK.
+
+### L9 — Normalización del scaffold y validación inicial
+
+Se configuró `mobile/app.json` y `mobile/package.json` para Panetto, se quitó el comando web de alcance futuro y se eliminaron `mobile/AGENTS.md`, `mobile/.claude/` y `mobile/LICENSE` generados por la plantilla (incluía una MIT no elegida). Se regeneró lockfile con scripts deshabilitados. `npx tsc --noEmit` y `npx expo-doctor` pasan (20/20); `npx expo export --platform ios` terminó con exit 0 y compiló el bundle iOS de 618 módulos. T1 scaffold está verificado y su commit queda pendiente; npm audit mantiene los 5 avisos moderados documentados en L8.
