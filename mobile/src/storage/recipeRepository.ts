@@ -85,6 +85,21 @@ function decodeRow(row: { id: string; recipe_json: string }): SavedRecipe {
     }
     const value = parsed as { name: unknown; ingredients: unknown; baseGrams?: unknown };
     if (typeof value.name !== 'string' || !Array.isArray(value.ingredients)) throw new Error('invalid recipe fields');
+    for (const ingredient of value.ingredients) {
+      if (typeof ingredient !== 'object' || ingredient === null || Array.isArray(ingredient)) {
+        throw new Error('invalid ingredient shape');
+      }
+      const fields = ingredient as Record<string, unknown>;
+      if (
+        typeof fields.id !== 'string' ||
+        typeof fields.name !== 'string' ||
+        typeof fields.isFlour !== 'boolean' ||
+        typeof fields.percentage !== 'number' ||
+        !Number.isFinite(fields.percentage)
+      ) {
+        throw new Error('invalid ingredient fields');
+      }
+    }
     if (value.baseGrams !== undefined) {
       if (typeof value.baseGrams !== 'object' || value.baseGrams === null || Array.isArray(value.baseGrams)) {
         throw new Error('invalid gram context');

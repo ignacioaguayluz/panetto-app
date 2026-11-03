@@ -143,7 +143,7 @@ La implementación está autorizada. El usuario autorizó inicializar un reposit
 - T0 [S1–S8] — Inicializar Git local y crear rama `feat/panetto-mobile-v1`; ruta: inline; estado: done, raíz y branch verificados; baseline commit `9705347`; sin remoto.
 - T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
 - T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: done; commit: `b657081` (`feat: add tested baker percentage domain`); RED/GREEN observado, test domain 10/10, domain/app typecheck pass; assessment medium, `reviewDue: false`, no verifier adicional requerido.
-- T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: in_progress (17/17 tests, strict domain/app typechecks, Expo Doctor and iOS/Android exports pass; commit/assessment pending; native runtime check in T6); commit: pendiente.
+- T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: in_progress (correction yields 17/17 tests and typechecks pass; correction commit, assessment and independent re-verification pending); initial commit `ea76092`, correction commit pending.
 - T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: pendiente; commit: pendiente.
 - T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
 - T6 [S1–S8] — Verificar integración en iOS y Android, accesibilidad, persistencia, documentación y límites conocidos; ruta: inline más verificación independiente cuando el riesgo lo requiera; estado: pendiente; commit: pendiente.
@@ -281,4 +281,20 @@ Se agregó `allowImportingTsExtensions` a `mobile/tsconfig.json`. `npm run typec
 
 ### L23 — GREEN y chequeos de almacenamiento
 
-`cd mobile && npm run test:domain` — exit 0, 17/17 (10 domain, 7 SQLite); `npm run typecheck:domain` y `npx tsc --noEmit` — exit 0; `npx expo-doctor` — exit 0, 20/20; `npx expo export --platform ios` — exit 0, 618 módulos; Android — exit 0, 616 módulos. Se corrigió error code `invalid_id`. Dos warnings de Node sobre MODULE_TYPELESS_PACKAGE_JSON siguen siendo no fatales. Native SQLite runtime permanece en T6 y no se declara cubierto por bundle export. T3 no se cerrará hasta guardar el commit y completar el assessment/verifier que indique RDD.
+`cd mobile && npm run test:domain` — exit 0, 17/17 (10 domain, 7 SQLite); `npm run typecheck:domain` y `npx tsc --noEmit` — exit 0; `npx expo-doctor` — exit 0, 20/20; `npx expo export --platform ios` — exit 0, 618 módulos; Android — exit 0, 616 módulos. Se corrigió error code `invalid_id`. Dos warnings de Node sobre MODULE_TYPELESS_PACKAGE_JSON siguen siendo no fatales. Native SQLite runtime permanece en T6 y no se declara cubierto por bundle export. T3 no se cerrará hasta completar la verificación independiente requerida por assessment.
+
+### L24 — Commit y assessment de persistencia
+
+T3 se registró en `ea76092` (`feat: persist recipes locally with SQLite`). Native ASSESS contra `b657081`: risk high por escalación item 1, `nativeRisk: medium`, `reviewDue: false` (`under_budget`), `agentEscalation.applied: true`, plan `independentVerifier: true`; native review no debida. Self-check padre: 17/17, typechecks, Expo Doctor 20/20, iOS export 618, Android export 616; diff-check limpio al commit. El verifier independiente revisó ea76092 contra b657081 y encontró un bloqueo S6: un ingrediente persistido con `isFlour: "false"` se acepta en vez de `corrupt_data`; S7/S8 storage portions accepted, UI obligations remain T4. La corrección requiere un nuevo test RED, validación de forma estricta en el límite de lectura y nueva verificación. Runtime SQLite por plataforma sigue asignado a T6.
+
+### L25 — Hallazgo independiente de corrupción
+
+El verifier inyectó el payload `{"name":"Pan","ingredients":[{"id":"f","name":"Harina","isFlour":"false","percentage":100}]}`. `repository.get(id)` resolvió y mantuvo `isFlour` como string, que JS trata como truthy. Baseline domain validator también tolera ese tipo inválido, pero no existía reader de almacenamiento; el nuevo límite S6 debe rechazar datos corruptos sin mutarlos. El verifier no cambió archivos. T3 sigue in_progress; reproducir con test RED y corregir antes de cerrar.
+
+### L26 — Reproducción de corrupción en storage
+
+Se amplió el test público de lectura corrupta con el payload exacto señalado por el verifier. `cd mobile && npm run test:domain` produjo RED exit 1: 16/17 pasan; `repository.get('bad-flag')` no rechaza `isFlour: "false"`. Queda reproducido en la rama del padre. Corregir la validación runtime de cada ingrediente dentro del límite de decode/lectura y volver a obtener GREEN; no cambiar la validación de dominio preexistente ni aceptar coerciones.
+
+### L27 — Corrección RED/GREEN del payload corrupto
+
+Se validan al decodificar los tipos runtime de `id`, `name`, `isFlour` boolean y `percentage` finito; los campos malformados ahora llegan a `corrupt_data` sin coerción. Tras el test RED 16/17 de L26, `cd mobile && npm run test:domain` volvió a exit 0, 17/17; `npm run typecheck:domain` y `npx tsc --noEmit` terminaron exit 0, `git diff --check` limpio. La corrección aún no tiene commit; repetir assessment item 1 y obtener verificación independiente antes de cerrar T3.

@@ -155,6 +155,15 @@ test('S6: reports corrupt stored recipes instead of silently discarding or repla
     await database.runAsync('INSERT INTO recipes (id, recipe_json) VALUES (?, ?)', 'broken', '{');
     await assert.rejects(repository.list(), (error: unknown) => error instanceof RepositoryError && error.code === 'corrupt_data');
     assert.deepEqual(await repository.get('valid'), { id: 'valid', ...flourRecipe() });
+    await database.runAsync(
+      'INSERT INTO recipes (id, recipe_json) VALUES (?, ?)',
+      'bad-flag',
+      JSON.stringify({
+        name: 'Pan',
+        ingredients: [{ id: 'flour', name: 'Harina', isFlour: 'false', percentage: 100 }],
+      }),
+    );
+    await assert.rejects(repository.get('bad-flag'), (error: unknown) => error instanceof RepositoryError && error.code === 'corrupt_data');
   } finally {
     database.close();
   }
