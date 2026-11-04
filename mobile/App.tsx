@@ -28,12 +28,16 @@ import {
 import { openExpoRecipeRepository } from './src/storage/expoRecipeRepository';
 import type { SavedRecipe } from './src/storage/recipeRepository';
 import {
+  calculateEditorProduction,
   draftWithRawValues,
   editorExitAction,
   persistEditorDraft,
+  productionSourceKey,
   recipeDraftFromSaved,
   syncRawValuesWithDraft,
   updateEditorIngredientValue,
+  updateProductionInput,
+  type ProductionCalculatorState,
   type EditorExitChoice,
 } from './src/ui/recipeEditorModel';
 
@@ -362,6 +366,7 @@ function AppContent() {
           <RecipeEditor
             draft={draft}
             rawValues={rawValues}
+            invalidInputs={invalidInputs}
             editing={editingId !== null}
             dirty={dirty}
             error={editorError}
@@ -499,6 +504,7 @@ function RecipeLibrary({
 function RecipeEditor({
   draft,
   rawValues,
+  invalidInputs,
   editing,
   dirty,
   error,
@@ -514,6 +520,7 @@ function RecipeEditor({
 }: {
   draft: RecipeDraft;
   rawValues: Readonly<Record<string, string>>;
+  invalidInputs: Readonly<Record<string, string>>;
   editing: boolean;
   dirty: boolean;
   error: string;
@@ -649,10 +656,79 @@ function RecipeEditor({
           <Text style={styles.flourNoteText}>La suma de las harinas debe ser 100 %. El resto de los ingredientes se calcula respecto de esa base.</Text>
         </View>
         {error ? <Text accessibilityRole="alert" style={styles.errorBanner}>{error}</Text> : null}
+        <ProductionCalculator
+          key={productionSourceKey(draft, rawValues, invalidInputs)}
+          draft={draft}
+          rawValues={rawValues}
+          invalidInputs={invalidInputs}
+        />
         <Text style={styles.draftNote}>
           {dirty ? 'Los cambios todavía no están guardados.' : 'Guardá la receta para conservar los cambios.'}
         </Text>
       </ScrollView>
+    </View>
+  );
+}
+
+function ProductionCalculator({ draft, rawValues, invalidInputs }: {
+  draft: RecipeDraft;
+  rawValues: Readonly<Record<string, string>>;
+  invalidInputs: Readonly<Record<string, string>>;
+}) {
+  const [state, setState] = useState<ProductionCalculatorState>({
+    pieceCount: '', gramsPerPiece: '', result: null, error: '',
+  });
+  const calculate = () => {
+    try {
+      const result = calculateEditorProduction(draft, rawValues, invalidInputs, state.pieceCount, state.gramsPerPiece);
+      setState(current => ({ ...current, result, error: '' }));
+    } catch (error) {
+      setState(current => ({ ...current, result: null, error: messageFor(error) }));
+    }
+  };
+  return (
+    <View style={styles.calculatorCard}>
+      <Text style={styles.sectionTitle}>Calculadora de producción</Text>
+      <Text style={styles.helperText}>Usa el borrador actual sin guardar ni modificar la receta. Al editar la fórmula se reinicia la calculadora.</Text>
+      <Text style={styles.fieldLabel}>CANTIDAD DE PIEZAS</Text>
+      <TextInput
+        accessibilityLabel="Cantidad de piezas"
+        keyboardType="number-pad"
+        value={state.pieceCount}
+        onChangeText={text => setState(current => updateProductionInput(current, 'pieceCount', text))}
+        placeholder="Ej.: 1"
+        placeholderTextColor={COLORS.muted}
+        style={styles.baseInput}
+      />
+      <Text style={styles.fieldLabel}>GRAMOS DE MASA CRUDA POR PIEZA</Text>
+      <TextInput
+        accessibilityLabel="Gramos de masa cruda por pieza"
+        keyboardType="decimal-pad"
+        value={state.gramsPerPiece}
+        onChangeText={text => setState(current => updateProductionInput(current, 'gramsPerPiece', text))}
+        placeholder="Ej.: 400 o 0,5"
+        placeholderTextColor={COLORS.muted}
+        style={styles.baseInput}
+      />
+      <Text style={styles.helperText}>Piezas: entero mayor que cero. Gramos: valor positivo, con coma o punto decimal.</Text>
+      <PrimaryButton label="Calcular" onPress={calculate} />
+      {state.error ? <Text accessibilityRole="alert" style={styles.errorBanner}>{state.error}</Text> : null}
+      {state.result ? (
+        <View accessibilityLiveRegion="polite" style={styles.productionResults}>
+          <Text style={styles.sectionTitle}>Producción en crudo</Text>
+          {state.result.rows.map(row => (
+            <View key={row.id} style={styles.productionRow}>
+              <Text style={styles.productionName}>{row.name}</Text>
+              <Text style={styles.productionWeight}>{row.text}</Text>
+            </View>
+          ))}
+          <View style={styles.productionRow}>
+            <Text style={styles.productionName}>Masa total</Text>
+            <Text style={styles.productionWeight}>{state.result.totalText}</Text>
+          </View>
+          <Text style={styles.helperText}>Gramos con hasta dos decimales; la suma mostrada puede variar levemente por redondeo. Masa madre y prefermentos se calculan como ingredientes directos.</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -687,6 +763,11 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  calculatorCard: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.line, borderRadius: 17, padding: 16, marginTop: 24, gap: 12 },
+  productionResults: { gap: 12, marginTop: 8 },
+  productionRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+  productionName: { flex: 1, color: COLORS.ink, fontSize: 15 },
+  productionWeight: { color: COLORS.green, fontSize: 16, fontWeight: '800', flexShrink: 1 },
   flex: { flex: 1 },
   safeArea: { flex: 1, backgroundColor: COLORS.background },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 12 },

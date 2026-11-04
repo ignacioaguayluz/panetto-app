@@ -1,13 +1,77 @@
 import {
+  calculateProduction,
   createDraft,
+  formatGrams,
   editIngredient,
   parseDecimal,
   RecipeValidationError,
   saveRecipe,
+  type Production,
   type Recipe,
   type RecipeDraft,
 } from '../domain/recipe.ts';
 import type { RecipeRepository, SavedRecipe } from '../storage/recipeRepository.ts';
+
+export interface EditorProductionResult {
+  readonly production: Production;
+  readonly rows: readonly { readonly id: string; readonly name: string; readonly text: string }[];
+  readonly totalText: string;
+}
+
+export interface ProductionCalculatorState {
+  readonly pieceCount: string;
+  readonly gramsPerPiece: string;
+  readonly result: EditorProductionResult | null;
+  readonly error: string;
+}
+
+/** A changed editor source remounts the calculator, dropping even results from rejected raw edits. */
+export function productionSourceKey(
+  draft: RecipeDraft,
+  rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>>,
+): string {
+  return JSON.stringify([draft, rawValues, invalidInputs]);
+}
+
+export function updateProductionInput(
+  state: ProductionCalculatorState,
+  field: 'pieceCount' | 'gramsPerPiece',
+  text: string,
+): ProductionCalculatorState {
+  return { ...state, [field]: text, result: null, error: '' };
+}
+
+/** A read-only calculation boundary: validation builds a formula but never writes to the repository. */
+export function calculateEditorProduction(
+  draft: RecipeDraft,
+  rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>>,
+  pieceCountText: string,
+  gramsPerPieceText: string,
+): EditorProductionResult {
+  let pieceCount: number;
+  try {
+    pieceCount = parseDecimal(pieceCountText);
+    if (!Number.isInteger(pieceCount) || pieceCount <= 0) throw new Error();
+  } catch {
+    throw new RecipeValidationError('La cantidad de piezas debe ser un entero mayor que cero.');
+  }
+  let gramsPerPiece: number;
+  try {
+    gramsPerPiece = parseDecimal(gramsPerPieceText);
+    if (gramsPerPiece <= 0) throw new Error();
+  } catch {
+    throw new RecipeValidationError('Los gramos por pieza deben ser un número finito mayor que cero, con coma o punto decimal.');
+  }
+  const recipe = buildRecipeForSave(draft, rawValues, invalidInputs);
+  const production = calculateProduction(recipe, pieceCount, gramsPerPiece);
+  return {
+    production,
+    rows: production.ingredients.map(item => ({ id: item.id, name: item.name, text: `${formatGrams(item.grams)} g` })),
+    totalText: `${formatGrams(production.totalGrams)} g`,
+  };
+}
 
 export interface RecipeEditorModel {
   readonly draft: RecipeDraft;
