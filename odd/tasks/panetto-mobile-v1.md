@@ -1,6 +1,6 @@
 # Panetto móvil V1 — especificación y ruta de ejecución
 
-Estado: implementación autorizada; se autorizó inicializar Git en el proyecto para habilitar rama de funcionalidad y commits de trabajo.
+Estado: implementación autorizada y reanudada; T4 activo, la interfaz del producto aún debe implementarse.
 Objetivo: una app local de recetas y escalado de producción para iOS y Android con Expo/React Native, priorizando a quienes producen pan para vender.
 Rama/entrega: crear `feat/panetto-mobile-v1`; runner aún por confirmar al inspeccionar el entorno móvil.
 
@@ -143,8 +143,8 @@ La implementación está autorizada. El usuario autorizó inicializar un reposit
 - T0 [S1–S8] — Inicializar Git local y crear rama `feat/panetto-mobile-v1`; ruta: inline; estado: done, raíz y branch verificados; baseline commit `9705347`; sin remoto.
 - T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
 - T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: done; commit: `b657081` (`feat: add tested baker percentage domain`); RED/GREEN observado, test domain 10/10, domain/app typecheck pass; assessment medium, `reviewDue: false`, no verifier adicional requerido.
-- T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: in_progress (correction yields 17/17 tests and typechecks pass; correction commit, assessment and independent re-verification pending); initial commit `ea76092`, correction commit pending.
-- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: pendiente; commit: pendiente.
+- T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: done; commits: `ea76092` (`feat: persist recipes locally with SQLite`), `f8f16f5` (`fix: reject malformed stored recipe fields`); 17/17 tests, typechecks, Expo Doctor and platform exports pass; assessment high item 1, independent verifier approved; native runtime proof T6.
+- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: in_progress; Expo safe-area dependency 5.11.1 installed; UI implementation now resumed; commit: pendiente.
 - T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
 - T6 [S1–S8] — Verificar integración en iOS y Android, accesibilidad, persistencia, documentación y límites conocidos; ruta: inline más verificación independiente cuando el riesgo lo requiera; estado: pendiente; commit: pendiente.
 
@@ -297,4 +297,40 @@ Se amplió el test público de lectura corrupta con el payload exacto señalado 
 
 ### L27 — Corrección RED/GREEN del payload corrupto
 
-Se validan al decodificar los tipos runtime de `id`, `name`, `isFlour` boolean y `percentage` finito; los campos malformados ahora llegan a `corrupt_data` sin coerción. Tras el test RED 16/17 de L26, `cd mobile && npm run test:domain` volvió a exit 0, 17/17; `npm run typecheck:domain` y `npx tsc --noEmit` terminaron exit 0, `git diff --check` limpio. La corrección aún no tiene commit; repetir assessment item 1 y obtener verificación independiente antes de cerrar T3.
+Se validan al decodificar los tipos runtime de `id`, `name`, `isFlour` boolean y `percentage` finito; los campos malformados ahora llegan a `corrupt_data` sin coerción. Tras el test RED 16/17 de L26, `cd mobile && npm run test:domain` volvió a exit 0, 17/17; `npm run typecheck:domain` y `npx tsc --noEmit` terminaron exit 0, `git diff --check` limpio.
+
+### L28 — Commit y assessment de corrección
+
+La corrección está en `f8f16f5` (`fix: reject malformed stored recipe fields`), 42 líneas incluyendo test regresión y registro. ASSESS contra `ea76092`: high por escalación item 1, `nativeRisk: medium`, `reviewDue: false` (`under_budget`), `agentEscalation.applied: true`, plan requiere self-verification e independent verifier. No se inició review nativa. Self-verification GREEN consta en L27.
+
+### L29 — Verificación independiente de corrección
+
+`gentle-ai-verify` leyó la especificación completa y comparó `ea76092..f8f16f5`. El payload `isFlour: "false"` ahora se rechaza como `corrupt_data`; reads corruptos no mutan el JSON ni la DB; registros válidos permanecen legibles. Probe aislado: RED en base, GREEN en corrección; storage 7/7, suite total con probe 18/18, typechecks y diff-check pasan. T3 storage scope aprobado S6/S7/S8, sin bloqueadores; UI de guardar/descartar/confirmación sigue T4 y runtime SQLite nativo sigue T6. Assessment high item 1 y verifier completados; native review no debida. T3 done; T4 pasa a in_progress.
+
+### L30 — Pausa y transferencia solicitadas por el usuario
+
+> “hey hay alguna forma de parar lo que tienes hecho resumirlo, y continuar en otra sesión?”
+
+El usuario ordenó pausar y transferir la implementación a otra sesión. En esta fase solo terminó `npx expo install react-native-safe-area-context` (exit 0; versión `5.11.1`), además del código de storage previo ya cerrado. No se llegó a escribir `App.tsx` ni pantallas. Estado Git al detener: cambios sin commit en `mobile/package.json`, `mobile/package-lock.json` por la nueva dependencia, y este documento. El usuario autorizó después reanudar desde T4, conservando esos cambios.
+
+### L31 — Reanudación autorizada
+
+> “puedes proseguir con la implementación por favor”
+
+Se reanuda T4 en la rama actual. Primero implementar el recetario/editor con borrador independiente, guardado explícito, diálogo de salir Guardar/Descartar/Seguir editando, confirmación de eliminación, soporte de safe areas y navegación atrás. T5 y pruebas nativas de T6 siguen pendientes.
+
+### L32 — RED/GREEN del modelo de edición
+
+Se añadieron pruebas de T4 para restaurar modo/contexto de recetas guardadas, rechazar entradas numéricas incompletas y mapear las tres decisiones al salir del editor. El focused test dio RED antes de implementar el módulo (`ERR_MODULE_NOT_FOUND`); luego pasó primero 4/4 y luego 5/5 al añadir `mobile/src/ui/recipeEditorModel.ts` y `editorExitAction`. La prueba de salida también dio RED cuando se añadió y GREEN después de implementar y conectar la decisión en `App.tsx`.
+
+### L33 — Primera UI del recetario y editor
+
+`mobile/App.tsx` reemplaza la plantilla con biblioteca local vacía por defecto, editor de nombre/ingredientes, modo gramos/porcentajes, marca de harina manual, conversiones usando el dominio existente, almacenamiento solo en botón explícito, guardia de salida nativa Guardar/Descartar/Seguir editando, BackHandler Android y confirmación nativa antes de eliminar. Se añadió `SafeAreaProvider` para safe areas. Autoverificación final: test suite 22/22, focused model tests 5/5, `npm run typecheck:domain` y `npx tsc --noEmit` exit 0; Expo Doctor 20/20; exports iOS 662 módulos y Android 660 módulos, exit 0; `git diff --check` limpio. Los warnings no fatales MODULE_TYPELESS_PACKAGE_JSON persisten. No se ejecutó en simuladores ni se verificó la interacción visual/gestual nativa; corresponde a T6. T4 continúa in_progress hasta commit, assessment y verificación independiente.
+
+### L34 — RED de decisiones de salida
+
+Se añadió test de flujo para mapear sin ambigüedad una sesión limpia a salir, y cambios pendientes a confirmar, guardar, descartar o seguir editando. `cd mobile && node --experimental-strip-types --experimental-sqlite --test tests/recipeEditorModel.test.ts` dio RED exit 1: el helper `editorExitAction` aún no existe.
+
+### L35 — GREEN final y verificación estática T4
+
+El helper `editorExitAction` y el handler de `App.tsx` ahora cubren Guardar, Descartar y Seguir editando; Discard descarta un editor nuevo sin crear registro y Save cierra solamente después de `repository.save` exitoso. Final checks: 22/22 tests, domain/app typechecks exit 0, Expo Doctor 20/20, iOS export 662 módulos, Android 660, `git diff --check` limpio. Sin ejecución en dispositivo/simulador (deferred T6). Los cinco advisories moderados transitivos ya registrados no se modificaron. Se prepara commit T4; después, assessment item 1 y verifier independiente.
