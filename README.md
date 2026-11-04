@@ -15,3 +15,7 @@ Desde Terminal, dentro de esta carpeta:
 El resultado es `build/Panetto.app`. Ábrelo con doble clic y, si te gusta, arrástralo a Aplicaciones.
 
 Las recetas se guardan solo en tu Mac.
+
+## Aplicación móvil
+
+La app móvil de Expo se desarrolla en `mobile/` y guarda cada recetario localmente en el dispositivo. Las recetas no se sincronizan entre dispositivos ni con un servicio en línea. La desinstalación de la app o la pérdida del dispositivo puede implicar perderlas; no se promete que el sistema operativo conserve una copia de respaldo.
