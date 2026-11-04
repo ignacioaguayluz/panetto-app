@@ -1,6 +1,6 @@
 # Panetto móvil V1 — especificación y ruta de ejecución
 
-Estado: implementación autorizada y reanudada; T4 activo, la interfaz del producto aún debe implementarse.
+Estado: T4 completado; implementación pausada antes de T5 por pedido explícito del usuario para continuar en otra sesión.
 Objetivo: una app local de recetas y escalado de producción para iOS y Android con Expo/React Native, priorizando a quienes producen pan para vender.
 Rama/entrega: crear `feat/panetto-mobile-v1`; runner aún por confirmar al inspeccionar el entorno móvil.
 
@@ -144,8 +144,8 @@ La implementación está autorizada. El usuario autorizó inicializar un reposit
 - T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
 - T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: done; commit: `b657081` (`feat: add tested baker percentage domain`); RED/GREEN observado, test domain 10/10, domain/app typecheck pass; assessment medium, `reviewDue: false`, no verifier adicional requerido.
 - T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: done; commits: `ea76092` (`feat: persist recipes locally with SQLite`), `f8f16f5` (`fix: reject malformed stored recipe fields`); 17/17 tests, typechecks, Expo Doctor and platform exports pass; assessment high item 1, independent verifier approved; native runtime proof T6.
-- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: in_progress (classification-toggle correction implemented; commit/assessment/independent verification pending; native simulator behavior assigned T6); commits: `1c74b8b`, `e9c4500`, `d2b609b`, fourth correction pending.
-- T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
+- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: done; commits: `1c74b8b` (`feat: build local recipe library and guarded editor`), `e9c4500` (`fix: retain invalid editor input until corrected`), `d2b609b` (`fix: keep domain-invalid ingredient input visible`), `e50dd5b` (`fix: preserve rejected input across reclassification`); assessment high/item1 and independent verifier approved; device/simulator checks remain T6.
+- T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: in_progress, pausado por pedido explícito del usuario después de T4 para continuar en otra sesión; commit: pendiente.
 - T6 [S1–S8] — Verificar integración en iOS y Android, accesibilidad, persistencia, documentación y límites conocidos; ruta: inline más verificación independiente cuando el riesgo lo requiera; estado: pendiente; commit: pendiente.
 
 ### Criterios técnicos para ejecutar sin nuevas consultas de diseño
@@ -379,4 +379,14 @@ Se reanuda T4. Priorizar la corrección puntual y su test de regresión, typeche
 
 ### L44 — GREEN de texto rechazado a través de cambios de clasificación
 
-La prueba de regresión reprodujo RED (7/8): harina `101` rechazada, agregar agua como harina y quitar harina original convertía el texto en `58.82352941176471`. Se agregó `invalidInputs` por ingrediente; el rechazo persiste aunque una reclasificación haga numéricamente válido el campo. Save y cambio de modo siguen rechazados con el mismo mensaje hasta que el usuario corrija el valor; eliminar el ingrediente elimina su error. La prueba verifica raw visible, cero llamadas a `repository.save` y datos almacenados intactos. GREEN focused 8/8, full suite 25/25, domain/app typechecks, iOS export 662 módulos, Android 660, diff-check limpios. Sin pruebas nativas (deferred T6). Commit, ASSESS item1 e independent verifier pendientes; tras aprobación, cerrar T4 y detenerse antes de T5 según L39.
+La prueba de regresión reprodujo RED (7/8): harina `101` rechazada, agregar agua como harina y quitar harina original convertía el texto en `58.82352941176471`. Se agregó `invalidInputs` por ingrediente; el rechazo persiste aunque una reclasificación haga numéricamente válido el campo. Save y cambio de modo siguen rechazados con el mismo mensaje hasta que el usuario corrija el valor; eliminar el ingrediente elimina su error. La prueba verifica raw visible, cero llamadas a `repository.save` y datos almacenados intactos. GREEN focused 8/8, full suite 25/25, domain/app typechecks, iOS export 662 módulos, Android 660, diff-check limpios. Sin pruebas nativas (deferred T6). Correction commit `e50dd5b`; ASSESS high/item1.
+
+### L45 — Verificación independiente final de T4
+
+`gentle-ai-verify` leyó toda la especificación y comparó `e50dd5b` contra `d2b609b`, con los commits anteriores de T4 como contexto. El caso `flour=101` → agua pasa a harina → harina original deja de ser harina conserva texto/error, bloquea Save antes de `repository.save` y mantiene SHA-256 del registro; ambos casos previos (`water=1,` → editar harina; `flour=101` → editar agua) también quedan bloqueados. Corregir input borra solo su marker; eliminar el ingrediente borra su error. Callback probes independientes: baseline 2/4, candidato 4/4; focused 8/8, suite 25/25, domain/app typechecks exit 0, combined tests+probes 29/29; exports iOS/Android 662/660 y diff-check exit 0 observados por el padre en L44. Veredicto: S1, S2, S3, S6, S7, S8 cumplidos para alcance T4; sin bloqueos. No hubo simulator/native SQLite/accessibility checks; siguen en T6. T4 done. El usuario pidió parar después de T4 y continuar T5/T6 en otra sesión; no iniciar esas tareas aquí.
+
+### L46 — Commit y próximo paso
+
+> “haz el commit y deja las instrucciones para el siguiente paso nada más por favor”
+
+T4, sus correcciones y esta evidencia quedan registrados en commits. En la próxima sesión, leer esta especificación y empezar T5 [S4–S5, S7]: integrar calculadora y resultados sin modificar la fórmula guardada; después seguir T6 para verificar iOS/Android, SQLite nativo y accesibilidad. No hay trabajo de código pendiente de T4.
