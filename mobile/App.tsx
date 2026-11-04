@@ -27,7 +27,15 @@ import {
 } from './src/domain/recipe';
 import { openExpoRecipeRepository } from './src/storage/expoRecipeRepository';
 import type { SavedRecipe } from './src/storage/recipeRepository';
-import { buildRecipeForSave, editorExitAction, recipeDraftFromSaved, type EditorExitChoice } from './src/ui/recipeEditorModel';
+import {
+  draftWithRawValues,
+  editorExitAction,
+  persistEditorDraft,
+  recipeDraftFromSaved,
+  syncRawValuesWithDraft,
+  updateEditorIngredientValue,
+  type EditorExitChoice,
+} from './src/ui/recipeEditorModel';
 
 const COLORS = {
   background: '#F7F4EC',
@@ -50,10 +58,6 @@ function messageFor(error: unknown): string {
 
 function createId(): string {
   return `recipe-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function valuesFromDraft(draft: RecipeDraft): Record<string, string> {
-  return Object.fromEntries(draft.ingredients.map(ingredient => [ingredient.id, String(ingredient.value)]));
 }
 
 function AppContent() {
@@ -107,9 +111,8 @@ function AppContent() {
     }
     setEditorError('');
     try {
-      const recipe = buildRecipeForSave(draft, rawValues);
       const id = editingId ?? createId();
-      await repository.save(id, recipe);
+      const recipe = await persistEditorDraft(repository, id, draft, rawValues);
       const saved = { id, ...recipe };
       setRecipes(current => {
         const exists = current.some(item => item.id === id);
@@ -226,18 +229,12 @@ function AppContent() {
   };
 
   const updateIngredientValue = (id: string, text: string) => {
-    setRawValues(current => ({ ...current, [id]: text }));
-    setDirty(true);
     if (!draft) return;
-    try {
-      const value = parseDecimal(text);
-      const updated = editIngredient(draft, id, { value });
-      setDraft(updated);
-      setRawValues(valuesFromDraft(updated));
-      setEditorError('');
-    } catch (error) {
-      setEditorError(messageFor(error));
-    }
+    const result = updateEditorIngredientValue(draft, id, text, rawValues);
+    setDraft(result.draft);
+    setRawValues({ ...result.rawValues });
+    setDirty(true);
+    setEditorError(result.error ?? '');
   };
 
   const toggleFlour = (id: string, isFlour: boolean) => {
@@ -245,7 +242,7 @@ function AppContent() {
     try {
       const updated = editIngredient(draft, id, { isFlour });
       setDraft(updated);
-      setRawValues(valuesFromDraft(updated));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues));
       setDirty(true);
       setEditorError('');
     } catch (error) {
@@ -259,7 +256,7 @@ function AppContent() {
     try {
       const updated = addIngredient(draft, { id, name: '', value: 0, isFlour: false });
       setDraft(updated);
-      setRawValues(valuesFromDraft(updated));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues));
       setDirty(true);
       setEditorError('');
     } catch (error) {
@@ -272,7 +269,7 @@ function AppContent() {
     try {
       const updated = removeIngredient(draft, id);
       setDraft(updated);
-      setRawValues(valuesFromDraft(updated));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues));
       setDirty(true);
       setEditorError('');
     } catch (error) {
@@ -289,9 +286,9 @@ function AppContent() {
       return;
     }
     try {
-      const updated = switchMode(draft, mode);
+      const updated = switchMode(draftWithRawValues(draft, rawValues), mode);
       setDraft(updated);
-      setRawValues(valuesFromDraft(updated));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues));
       setDirty(true);
       setEditorError('');
     } catch (error) {
@@ -303,9 +300,9 @@ function AppContent() {
     if (!draft) return;
     try {
       const baseGrams = parseDecimal(baseGramsText);
-      const updated = switchMode(draft, 'grams', baseGrams);
+      const updated = switchMode(draftWithRawValues(draft, rawValues), 'grams', baseGrams);
       setDraft(updated);
-      setRawValues(valuesFromDraft(updated));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues));
       setDirty(true);
       setEditorError('');
       setBaseModalVisible(false);

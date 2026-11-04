@@ -1,8 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDraft, RecipeValidationError } from '../src/domain/recipe.ts';
-import { buildRecipeForSave, editorExitAction, recipeDraftFromSaved } from '../src/ui/recipeEditorModel.ts';
-import type { SavedRecipe } from '../src/storage/recipeRepository.ts';
+import {
+  buildRecipeForSave,
+  editorExitAction,
+  persistEditorDraft,
+  recipeDraftFromSaved,
+  updateEditorIngredientValue,
+} from '../src/ui/recipeEditorModel.ts';
+import type { RecipeRepository, SavedRecipe } from '../src/storage/recipeRepository.ts';
 
 const ingredients = [
   { id: 'flour', name: 'Harina', isFlour: true, percentage: 100 },
@@ -55,4 +61,38 @@ test('T4: exit decisions preserve Save, Discard and Continue editing semantics',
   assert.equal(editorExitAction(true, 'save'), 'save');
   assert.equal(editorExitAction(true, 'discard'), 'discard');
   assert.equal(editorExitAction(true, 'stay'), 'stay');
+});
+
+test('S3/S7: another field edit retains invalid text and prevents a stale save', async () => {
+  let saveCalls = 0;
+  let stored: SavedRecipe = {
+    id: 'bread', name: 'Pan', ingredients, baseGrams: { flour: 500, water: 350 },
+  };
+  const repository: RecipeRepository = {
+    initialize: async () => {},
+    list: async () => [stored],
+    get: async () => stored,
+    save: async (id, recipe) => { saveCalls += 1; stored = { id, ...recipe }; },
+    delete: async () => {},
+  };
+  const initial = recipeDraftFromSaved(stored);
+  const invalidWater = updateEditorIngredientValue(
+    initial.draft, 'water', '1,', initial.rawValues,
+  );
+  const changedFlour = updateEditorIngredientValue(
+    invalidWater.draft, 'flour', '600', invalidWater.rawValues,
+  );
+
+  assert.equal(invalidWater.rawValues.water, '1,');
+  assert.equal(changedFlour.rawValues.water, '1,');
+  assert.equal(changedFlour.draft.ingredients.find(item => item.id === 'flour')?.value, 600);
+  await assert.rejects(
+    persistEditorDraft(repository, 'bread', changedFlour.draft, changedFlour.rawValues),
+    (error: unknown) => error instanceof RecipeValidationError &&
+      error.message === 'Ingresa un número válido, con coma o punto decimal y sin separadores de miles.',
+  );
+  assert.equal(saveCalls, 0);
+  assert.deepEqual(stored, {
+    id: 'bread', name: 'Pan', ingredients, baseGrams: { flour: 500, water: 350 },
+  });
 });

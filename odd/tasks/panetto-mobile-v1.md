@@ -144,7 +144,7 @@ La implementación está autorizada. El usuario autorizó inicializar un reposit
 - T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
 - T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: done; commit: `b657081` (`feat: add tested baker percentage domain`); RED/GREEN observado, test domain 10/10, domain/app typecheck pass; assessment medium, `reviewDue: false`, no verifier adicional requerido.
 - T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: done; commits: `ea76092` (`feat: persist recipes locally with SQLite`), `f8f16f5` (`fix: reject malformed stored recipe fields`); 17/17 tests, typechecks, Expo Doctor and platform exports pass; assessment high item 1, independent verifier approved; native runtime proof T6.
-- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: in_progress; Expo safe-area dependency 5.11.1 installed; UI implementation now resumed; commit: pendiente.
+- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: in_progress (stale-input correction implemented, independent verifier pending; native simulator behavior assigned T6); commits: `1c74b8b` (`feat: build local recipe library and guarded editor`), correction commit pending.
 - T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
 - T6 [S1–S8] — Verificar integración en iOS y Android, accesibilidad, persistencia, documentación y límites conocidos; ruta: inline más verificación independiente cuando el riesgo lo requiera; estado: pendiente; commit: pendiente.
 
@@ -333,4 +333,22 @@ Se añadió test de flujo para mapear sin ambigüedad una sesión limpia a salir
 
 ### L35 — GREEN final y verificación estática T4
 
-El helper `editorExitAction` y el handler de `App.tsx` ahora cubren Guardar, Descartar y Seguir editando; Discard descarta un editor nuevo sin crear registro y Save cierra solamente después de `repository.save` exitoso. Final checks: 22/22 tests, domain/app typechecks exit 0, Expo Doctor 20/20, iOS export 662 módulos, Android 660, `git diff --check` limpio. Sin ejecución en dispositivo/simulador (deferred T6). Los cinco advisories moderados transitivos ya registrados no se modificaron. Se prepara commit T4; después, assessment item 1 y verifier independiente.
+El helper `editorExitAction` y el handler de `App.tsx` ahora cubren Guardar, Descartar y Seguir editando; Discard descarta un editor nuevo sin crear registro y Save cierra solamente después de `repository.save` exitoso. Final checks: 22/22 tests, domain/app typechecks exit 0, Expo Doctor 20/20, iOS export 662 módulos, Android 660, `git diff --check` limpio. Sin ejecución en dispositivo/simulador (deferred T6). Los cinco advisories moderados transitivos ya registrados no se modificaron. Commit T4 `1c74b8b`; assessment item 1 y verifier independiente documentados en L36.
+
+### L36 — Commit y assessment T4
+
+El work unit quedó en `1c74b8b` (`feat: build local recipe library and guarded editor`). ASSESS de rango comprometido contra `f8f16f5`: risk high por escalación item 1, `nativeRisk: medium`, `reviewDue: false` (`under_budget`), `agentEscalation.applied: true`; plan requiere self-verification e independent verifier. Native review no debida. La verificación independiente encontró un bloqueo S3/S7; T4 sigue in_progress. Las pruebas en simuladores y flujos visuales de UI siguen T6.
+
+### L37 — Hallazgo independiente de guardado obsoleto
+
+El verifier probó el callback real: al abrir una receta 500 g harina/350 g agua, escribir `1,` para agua y después cambiar harina a 600, `App.tsx` reemplaza todos los textos editables con valores del borrador anterior; se borra la entrada inválida y Guardar persiste 350 g de agua sin avisar. Esto viola S3/S7, aunque guardar inmediatamente después de `1,` sí falla. La verificación probó que la edición original no contemplaba ese caso. El padre agregó una prueba RED para el flujo y observó el rechazo inicial por helpers no implementados. Una prueba AST ad hoc no transpila anotaciones TypeScript dentro del VM; no se contabilizó como reproducción padre. Se corrigió según la evidencia del callback aislado del verifier.
+
+### L38 — Corrección y verificación propia de guardado obsoleto
+
+`updateEditorIngredientValue` conserva el texto inválido (`1,`) mientras una edición válida de harina cambia el borrador; `syncRawValuesWithDraft` mantiene entradas inválidas en add/remove/toggle y `draftWithRawValues` rechaza el cambio de modo si cualquier campo es inválido. `persistEditorDraft` valida antes de llamar al repositorio. La regresión pública del modelo reproduce el orden editar agua → harina, confirma que Guardar rechaza con `RecipeValidationError`, que `repository.save` se invoca cero veces y que la receta persistida sigue intacta. RED/GREEN observado; focused 6/6, suite 23/23, domain/app typechecks, iOS/Android exports (662/660 módulos) y diff-check pasan. Próximo: correction commit, assessment item1 y nueva verificación independiente.
+
+### L39 — Pausa tras T4 solicitada
+
+> “hey apenas este listo el paso 5 Construir recetario y editor móvil, detente y deja todo para el paso 6 Integrar calculadora y verificar iOS/Android, continuarlo en otra sesión por favor, deja todo listo para que sigas justo donde lo dejarás”
+
+Continuar solo hasta cerrar T4 con commit de corrección y verificación independiente. Luego no iniciar T5 ni T6 en esta sesión; actualizar task file, Engram y TODO con T5 como próximo paso pausado, y dejar branch/working tree y evidencias listos para reanudar.
