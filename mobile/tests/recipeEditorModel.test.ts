@@ -63,6 +63,32 @@ test('T4: exit decisions preserve Save, Discard and Continue editing semantics',
   assert.equal(editorExitAction(true, 'stay'), 'stay');
 });
 
+test('S3/S7: rejected flour range survives another valid edit', async () => {
+  let saveCalls = 0;
+  const stored: SavedRecipe = { id: 'bread', name: 'Pan', ingredients };
+  const before = JSON.stringify(stored);
+  const repository: RecipeRepository = {
+    initialize: async () => {},
+    list: async () => [stored],
+    get: async () => stored,
+    save: async () => { saveCalls += 1; },
+    delete: async () => {},
+  };
+  const initial = recipeDraftFromSaved(stored);
+  const rejected = updateEditorIngredientValue(initial.draft, 'flour', '101', initial.rawValues);
+  assert.equal(rejected.error, 'El porcentaje de una harina debe estar entre 0 y 100.');
+  assert.equal(rejected.rawValues.flour, '101');
+
+  const changed = updateEditorIngredientValue(rejected.draft, 'water', '75', rejected.rawValues);
+  assert.equal(changed.rawValues.flour, '101');
+  await assert.rejects(
+    persistEditorDraft(repository, 'bread', changed.draft, changed.rawValues),
+    { message: 'El porcentaje de una harina debe estar entre 0 y 100.' },
+  );
+  assert.equal(saveCalls, 0);
+  assert.equal(JSON.stringify(stored), before);
+});
+
 test('S3/S7: another field edit retains invalid text and prevents a stale save', async () => {
   let saveCalls = 0;
   let stored: SavedRecipe = {

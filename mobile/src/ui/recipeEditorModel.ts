@@ -52,7 +52,8 @@ export function syncRawValuesWithDraft(
     const raw = rawValues[ingredient.id];
     if (raw !== undefined) {
       try {
-        parseDecimal(raw);
+        const value = parseDecimal(raw);
+        editIngredient(draft, ingredient.id, { value });
       } catch {
         return [ingredient.id, raw];
       }
