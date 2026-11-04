@@ -70,6 +70,7 @@ function AppContent() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<RecipeDraft | null>(null);
   const [rawValues, setRawValues] = useState<Record<string, string>>({});
+  const [invalidInputs, setInvalidInputs] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
   const [baseModalVisible, setBaseModalVisible] = useState(false);
   const [baseGramsText, setBaseGramsText] = useState('');
@@ -99,6 +100,7 @@ function AppContent() {
     setEditingId(null);
     setDraft(null);
     setRawValues({});
+    setInvalidInputs({});
     setDirty(false);
     setEditorError('');
     setBaseModalVisible(false);
@@ -112,7 +114,7 @@ function AppContent() {
     setEditorError('');
     try {
       const id = editingId ?? createId();
-      const recipe = await persistEditorDraft(repository, id, draft, rawValues);
+      const recipe = await persistEditorDraft(repository, id, draft, rawValues, invalidInputs);
       const saved = { id, ...recipe };
       setRecipes(current => {
         const exists = current.some(item => item.id === id);
@@ -126,7 +128,7 @@ function AppContent() {
       setEditorError(messageFor(error));
       return false;
     }
-  }, [closeEditor, draft, editingId, rawValues, repository]);
+  }, [closeEditor, draft, editingId, invalidInputs, rawValues, repository]);
 
   const handleExit = useCallback((choice?: EditorExitChoice) => {
     const action = editorExitAction(dirty, choice);
@@ -166,6 +168,7 @@ function AppContent() {
     setEditingId(null);
     setDraft(nextDraft);
     setRawValues({});
+    setInvalidInputs({});
     setDirty(false);
     setEditorError('');
     setScreen('editor');
@@ -180,6 +183,7 @@ function AppContent() {
       setEditingId(stored.id);
       setDraft(model.draft);
       setRawValues({ ...model.rawValues });
+      setInvalidInputs({});
       setDirty(false);
       setScreen('editor');
     } catch (error) {
@@ -216,7 +220,7 @@ function AppContent() {
   const updateName = (name: string) => {
     setDraft(current => current ? { ...current, name } : current);
     setDirty(true);
-    setEditorError('');
+    setEditorError(Object.values(invalidInputs)[0] ?? '');
   };
 
   const updateIngredientName = (id: string, name: string) => {
@@ -225,16 +229,17 @@ function AppContent() {
       ingredients: current.ingredients.map(item => item.id === id ? { ...item, name } : item),
     } : current);
     setDirty(true);
-    setEditorError('');
+    setEditorError(Object.values(invalidInputs)[0] ?? '');
   };
 
   const updateIngredientValue = (id: string, text: string) => {
     if (!draft) return;
-    const result = updateEditorIngredientValue(draft, id, text, rawValues);
+    const result = updateEditorIngredientValue(draft, id, text, rawValues, invalidInputs);
     setDraft(result.draft);
     setRawValues({ ...result.rawValues });
+    setInvalidInputs({ ...result.invalidInputs });
     setDirty(true);
-    setEditorError(result.error ?? '');
+    setEditorError(Object.values(result.invalidInputs)[0] ?? result.error ?? '');
   };
 
   const toggleFlour = (id: string, isFlour: boolean) => {
@@ -242,9 +247,9 @@ function AppContent() {
     try {
       const updated = editIngredient(draft, id, { isFlour });
       setDraft(updated);
-      setRawValues(syncRawValuesWithDraft(updated, rawValues));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues, invalidInputs));
       setDirty(true);
-      setEditorError('');
+      setEditorError(Object.values(invalidInputs)[0] ?? '');
     } catch (error) {
       setEditorError(messageFor(error));
     }
@@ -256,9 +261,9 @@ function AppContent() {
     try {
       const updated = addIngredient(draft, { id, name: '', value: 0, isFlour: false });
       setDraft(updated);
-      setRawValues(syncRawValuesWithDraft(updated, rawValues));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues, invalidInputs));
       setDirty(true);
-      setEditorError('');
+      setEditorError(Object.values(invalidInputs)[0] ?? '');
     } catch (error) {
       setEditorError(messageFor(error));
     }
@@ -268,10 +273,12 @@ function AppContent() {
     if (!draft) return;
     try {
       const updated = removeIngredient(draft, id);
+      const { [id]: _removedInput, ...remainingInvalidInputs } = invalidInputs;
       setDraft(updated);
-      setRawValues(syncRawValuesWithDraft(updated, rawValues));
+      setInvalidInputs(remainingInvalidInputs);
+      setRawValues(syncRawValuesWithDraft(updated, rawValues, remainingInvalidInputs));
       setDirty(true);
-      setEditorError('');
+      setEditorError(Object.values(remainingInvalidInputs)[0] ?? '');
     } catch (error) {
       setEditorError(messageFor(error));
     }
@@ -286,9 +293,9 @@ function AppContent() {
       return;
     }
     try {
-      const updated = switchMode(draftWithRawValues(draft, rawValues), mode);
+      const updated = switchMode(draftWithRawValues(draft, rawValues, invalidInputs), mode);
       setDraft(updated);
-      setRawValues(syncRawValuesWithDraft(updated, rawValues));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues, invalidInputs));
       setDirty(true);
       setEditorError('');
     } catch (error) {
@@ -300,9 +307,9 @@ function AppContent() {
     if (!draft) return;
     try {
       const baseGrams = parseDecimal(baseGramsText);
-      const updated = switchMode(draftWithRawValues(draft, rawValues), 'grams', baseGrams);
+      const updated = switchMode(draftWithRawValues(draft, rawValues, invalidInputs), 'grams', baseGrams);
       setDraft(updated);
-      setRawValues(syncRawValuesWithDraft(updated, rawValues));
+      setRawValues(syncRawValuesWithDraft(updated, rawValues, invalidInputs));
       setDirty(true);
       setEditorError('');
       setBaseModalVisible(false);

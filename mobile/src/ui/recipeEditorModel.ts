@@ -2,6 +2,7 @@ import {
   createDraft,
   editIngredient,
   parseDecimal,
+  RecipeValidationError,
   saveRecipe,
   type Recipe,
   type RecipeDraft,
@@ -24,6 +25,7 @@ export function editorExitAction(hasUnsavedChanges: boolean, choice?: EditorExit
 export interface IngredientEditResult {
   readonly draft: RecipeDraft;
   readonly rawValues: Readonly<Record<string, string>>;
+  readonly invalidInputs: Readonly<Record<string, string>>;
   readonly error?: string;
 }
 
@@ -33,13 +35,21 @@ export function updateEditorIngredientValue(
   id: string,
   text: string,
   rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>> = {},
 ): IngredientEditResult {
   const pending = { ...rawValues, [id]: text };
   try {
     const updated = editIngredient(draft, id, { value: parseDecimal(text) });
-    return { draft: updated, rawValues: syncRawValuesWithDraft(updated, pending) };
+    const nextInvalidInputs = { ...invalidInputs };
+    delete nextInvalidInputs[id];
+    return {
+      draft: updated,
+      rawValues: syncRawValuesWithDraft(updated, pending, nextInvalidInputs),
+      invalidInputs: nextInvalidInputs,
+    };
   } catch (error) {
-    return { draft, rawValues: pending, error: error instanceof Error ? error.message : 'No se pudo actualizar el ingrediente.' };
+    const message = error instanceof Error ? error.message : 'No se pudo actualizar el ingrediente.';
+    return { draft, rawValues: pending, invalidInputs: { ...invalidInputs, [id]: message }, error: message };
   }
 }
 
@@ -47,9 +57,13 @@ export function updateEditorIngredientValue(
 export function syncRawValuesWithDraft(
   draft: RecipeDraft,
   rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>> = {},
 ): Record<string, string> {
   return Object.fromEntries(draft.ingredients.map(ingredient => {
     const raw = rawValues[ingredient.id];
+    if (invalidInputs[ingredient.id] !== undefined) {
+      return [ingredient.id, raw ?? String(ingredient.value)];
+    }
     if (raw !== undefined) {
       try {
         const value = parseDecimal(raw);
@@ -66,7 +80,10 @@ export function syncRawValuesWithDraft(
 export function draftWithRawValues(
   draft: RecipeDraft,
   rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>> = {},
 ): RecipeDraft {
+  const error = Object.values(invalidInputs)[0];
+  if (error !== undefined) throw new RecipeValidationError(error);
   return {
     ...draft,
     ingredients: draft.ingredients.map(ingredient => ({
@@ -102,7 +119,10 @@ export function recipeDraftFromSaved(recipe: SavedRecipe): RecipeEditorModel {
 export function buildRecipeForSave(
   draft: RecipeDraft,
   rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>> = {},
 ): Recipe {
+  const error = Object.values(invalidInputs)[0];
+  if (error !== undefined) throw new RecipeValidationError(error);
   return saveRecipe({
     ...draft,
     ingredients: draft.ingredients.map(ingredient => ({
@@ -118,8 +138,9 @@ export async function persistEditorDraft(
   id: string,
   draft: RecipeDraft,
   rawValues: Readonly<Record<string, string>>,
+  invalidInputs: Readonly<Record<string, string>> = {},
 ): Promise<Recipe> {
-  const recipe = buildRecipeForSave(draft, rawValues);
+  const recipe = buildRecipeForSave(draft, rawValues, invalidInputs);
   await repository.save(id, recipe);
   return recipe;
 }

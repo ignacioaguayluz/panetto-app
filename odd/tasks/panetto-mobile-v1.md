@@ -144,7 +144,7 @@ La implementación está autorizada. El usuario autorizó inicializar un reposit
 - T1 [S1] — Preparar y validar scaffold Expo aislado, identidad de app y dependencias generadas; ruta: inline (worker no disponible tras rechazo del estado publicado); estado: done; commit: `cb13417` (`feat: scaffold Panetto mobile app`); assessment high por escalación item 5, independent verifier aprobado; revisión nativa no debida (`reviewDue: false`).
 - T2 [S2–S5] — Implementar dominio puro y validaciones con pruebas primero: ingreso, normalización de harinas y escalado; ruta: delegated to bounded worker due context backstop; estado: done; commit: `b657081` (`feat: add tested baker percentage domain`); RED/GREEN observado, test domain 10/10, domain/app typecheck pass; assessment medium, `reviewDue: false`, no verifier adicional requerido.
 - T3 [S6–S8] — Implementar almacenamiento SQLite local, validación antes de persistir, lecturas corruptas explícitas, actualizaciones/eliminaciones y manejo de fallos con pruebas de interfaz pública; ruta: inline; estado: done; commits: `ea76092` (`feat: persist recipes locally with SQLite`), `f8f16f5` (`fix: reject malformed stored recipe fields`); 17/17 tests, typechecks, Expo Doctor and platform exports pass; assessment high item 1, independent verifier approved; native runtime proof T6.
-- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: in_progress (range-error correction implemented, awaiting commit/assessment/independent verification; native simulator behavior assigned T6); commits: `1c74b8b` and `e9c4500`; third correction pending.
+- T4 [S1–S3, S6–S8] — Implementar recetario y editor móvil, guardado explícito, salida protegida y eliminación confirmada; ruta: inline; estado: in_progress (classification-toggle correction implemented; commit/assessment/independent verification pending; native simulator behavior assigned T6); commits: `1c74b8b`, `e9c4500`, `d2b609b`, fourth correction pending.
 - T5 [S4–S5, S7] — Implementar calculadora y resultados conectados al dominio, sin modificar la fórmula guardada; ruta: inline; estado: pendiente; commit: pendiente.
 - T6 [S1–S8] — Verificar integración en iOS y Android, accesibilidad, persistencia, documentación y límites conocidos; ruta: inline más verificación independiente cuando el riesgo lo requiera; estado: pendiente; commit: pendiente.
 
@@ -359,4 +359,24 @@ Continuar solo hasta cerrar T4 con commit de corrección y verificación indepen
 
 ### L41 — Segunda corrección de guardado obsoleto
 
-El verifier encontró que `101` en harina es rechazado por `editIngredient` con el error `El porcentaje de una harina debe estar entre 0 y 100.`, pero `syncRawValuesWithDraft` solo verificaba `parseDecimal`; al cambiar agua el campo se reemplazaba con `100` y guardaba. Se añadió test S3/S7, RED exacto observado: `'100' !== '101'`. Ahora la sincronización además aplica `editIngredient` como validación de cada input antes de reemplazar su texto; valores rechazados por reglas de dominio permanecen visibles y `persistEditorDraft` los bloquea antes de escribir. GREEN focused 7/7, suite 24/24, domain/app typechecks, Expo iOS 662/Android 660 exports y diff-check pass. Requiere tercer correction commit, assessment item 1 e independent verifier antes de T4 done.
+El verifier encontró que `101` en harina es rechazado por `editIngredient` con el error `El porcentaje de una harina debe estar entre 0 y 100.`, pero `syncRawValuesWithDraft` solo verificaba `parseDecimal`; al cambiar agua el campo se reemplazaba con `100` y guardaba. Se añadió test S3/S7, RED exacto observado: `'100' !== '101'`. Ahora la sincronización además aplica `editIngredient` como validación de cada input antes de reemplazar su texto; valores rechazados por reglas de dominio permanecen visibles y `persistEditorDraft` los bloquea antes de escribir. GREEN focused 7/7, suite 24/24, domain/app typechecks, Expo iOS 662/Android 660 exports y diff-check pass. Fix committed as `d2b609b`, assessment high/item1; independent verifier found a further classification-toggle case.
+
+### L42 — Hallazgo en cambio de clasificación y pausa solicitada
+
+El verifier probó en el candidato `d2b609b`: en una receta solo porcentaje, harina 100%/agua 70%, ingresar harina `101` produce el error esperado; marcar el agua como harina y luego desmarcar la harina original puede reemplazar `101` por `58.82352941176471` y permitir guardar ese valor obsoleto. La prueba reproduce el comportamiento también en `1c74b8b`; sigue violando S2/S3/S7. Aún no se añadió ni ejecutó corrección para este caso.
+
+El usuario pidió:
+
+> “hey para un momento y dime que estas realizando que estas tardando tanto”
+
+Se pausó el código para explicar el bloqueo; próximo paso T4: test RED del rango rechazado seguido por cambios de clasificación, conservar el campo y bloquear Save sin escrituras; luego commit, assessment item1 y verifier. No iniciar T5 hasta T4 completo; después detenerse según L39. La app nativa/touch y SQLite real siguen T6.
+
+### L43 — Reanudación con preferencia de entrega rápida
+
+> “perfecto continua, intenta no demorarte mucho más, al final es una primera versión luego haremos pruebas”
+
+Se reanuda T4. Priorizar la corrección puntual y su test de regresión, typechecks y verificación independiente requerida por el riesgo de datos; no ampliar a una batería de pruebas nativas ahora. La UI/SQLite de dispositivo siguen asignadas a T6, y la implementación debe detenerse al cerrar T4 antes de T5 conforme L39.
+
+### L44 — GREEN de texto rechazado a través de cambios de clasificación
+
+La prueba de regresión reprodujo RED (7/8): harina `101` rechazada, agregar agua como harina y quitar harina original convertía el texto en `58.82352941176471`. Se agregó `invalidInputs` por ingrediente; el rechazo persiste aunque una reclasificación haga numéricamente válido el campo. Save y cambio de modo siguen rechazados con el mismo mensaje hasta que el usuario corrija el valor; eliminar el ingrediente elimina su error. La prueba verifica raw visible, cero llamadas a `repository.save` y datos almacenados intactos. GREEN focused 8/8, full suite 25/25, domain/app typechecks, iOS export 662 módulos, Android 660, diff-check limpios. Sin pruebas nativas (deferred T6). Commit, ASSESS item1 e independent verifier pendientes; tras aprobación, cerrar T4 y detenerse antes de T5 según L39.

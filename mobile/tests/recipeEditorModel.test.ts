@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createDraft, RecipeValidationError } from '../src/domain/recipe.ts';
+import { createDraft, editIngredient, RecipeValidationError } from '../src/domain/recipe.ts';
 import {
   buildRecipeForSave,
   editorExitAction,
   persistEditorDraft,
   recipeDraftFromSaved,
+  syncRawValuesWithDraft,
   updateEditorIngredientValue,
 } from '../src/ui/recipeEditorModel.ts';
 import type { RecipeRepository, SavedRecipe } from '../src/storage/recipeRepository.ts';
@@ -83,6 +84,35 @@ test('S3/S7: rejected flour range survives another valid edit', async () => {
   assert.equal(changed.rawValues.flour, '101');
   await assert.rejects(
     persistEditorDraft(repository, 'bread', changed.draft, changed.rawValues),
+    { message: 'El porcentaje de una harina debe estar entre 0 y 100.' },
+  );
+  assert.equal(saveCalls, 0);
+  assert.equal(JSON.stringify(stored), before);
+});
+
+test('S2/S3/S7: classification changes preserve rejected flour input and block Save', async () => {
+  let saveCalls = 0;
+  const stored: SavedRecipe = { id: 'bread', name: 'Pan', ingredients };
+  const before = JSON.stringify(stored);
+  const repository: RecipeRepository = {
+    initialize: async () => {},
+    list: async () => [stored],
+    get: async () => stored,
+    save: async () => { saveCalls += 1; },
+    delete: async () => {},
+  };
+  const initial = recipeDraftFromSaved(stored);
+  const rejected = updateEditorIngredientValue(initial.draft, 'flour', '101', initial.rawValues);
+  assert.equal(rejected.error, 'El porcentaje de una harina debe estar entre 0 y 100.');
+
+  const waterMarkedAsFlour = editIngredient(rejected.draft, 'water', { isFlour: true });
+  const afterAddingFlour = syncRawValuesWithDraft(waterMarkedAsFlour, rejected.rawValues, rejected.invalidInputs);
+  const originalFlourUnmarked = editIngredient(waterMarkedAsFlour, 'flour', { isFlour: false });
+  const finalRawValues = syncRawValuesWithDraft(originalFlourUnmarked, afterAddingFlour, rejected.invalidInputs);
+
+  assert.equal(finalRawValues.flour, '101');
+  await assert.rejects(
+    persistEditorDraft(repository, 'bread', originalFlourUnmarked, finalRawValues, rejected.invalidInputs),
     { message: 'El porcentaje de una harina debe estar entre 0 y 100.' },
   );
   assert.equal(saveCalls, 0);
