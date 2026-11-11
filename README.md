@@ -2,7 +2,7 @@
 
 Recipe and production calculator for bakers, based on baker's percentages. Enter the weights of a reference recipe, choose how many pieces you want and the raw dough weight of each, and Panetto calculates the quantities to prepare.
 
-- **Mobile (Expo / React Native / TypeScript):** in `mobile/`. Recipe books are stored locally on the device; nothing is synced online, and recipes work offline.
+- **Mobile (Expo / React Native / TypeScript):** in `mobile/`. Recipe books are stored locally on the device with SQLite; nothing is synced online, and recipes work offline.
 - **macOS (SwiftUI):** build with `./scripts/build.sh`, which produces `build/Panetto.app`.
 - **Tests:** domain logic (recipes, production calculator, storage, editor model) is covered by automated tests in `mobile/tests/`.
 
@@ -18,6 +18,7 @@ Run the mobile app:
 cd mobile
 npm install
 npm run android   # or: npm run ios / npm start
+npm run test:domain   # domain and storage tests
 ```
 
 ---
