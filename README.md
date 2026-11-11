@@ -1,5 +1,29 @@
 # Panetto
 
+Recipe and production calculator for bakers, based on baker's percentages. Enter the weights of a reference recipe, choose how many pieces you want and the raw dough weight of each, and Panetto calculates the quantities to prepare.
+
+- **Mobile (Expo / React Native / TypeScript):** in `mobile/`. Recipe books are stored locally on the device; nothing is synced online, and recipes work offline.
+- **macOS (SwiftUI):** build with `./scripts/build.sh`, which produces `build/Panetto.app`.
+- **Tests:** domain logic (recipes, production calculator, storage, editor model) is covered by automated tests in `mobile/tests/`.
+
+Built from my own experience as a baker and pastry cook. The app interface is in Spanish.
+
+| Recipe list | Recipe editor | Production calculator |
+| --- | --- | --- |
+| ![Recipe list](docs/screenshots/recipe-list.png) | ![Recipe editor](docs/screenshots/recipe-editor.png) | ![Production calculator](docs/screenshots/production-calculator.png) |
+
+Run the mobile app:
+
+```bash
+cd mobile
+npm install
+npm run android   # or: npm run ios / npm start
+```
+
+---
+
+## Documentación en español
+
 Aplicación local de macOS para recetas de pan con porcentaje panadero y escalado de producción.
 
 Ingresa los pesos de tu receta de referencia sin que Panetto modifique los demás ingredientes. Luego indica cuántos panes quieres y el peso de cada uno; **Calcular receta** muestra las cantidades que necesitas preparar.
